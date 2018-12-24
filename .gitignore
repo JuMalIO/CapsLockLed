@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+
+# Visual Studio Files
+Debug
+Release
+*.suo
+*.vcxproj.user
+*.aps
+/.vs
