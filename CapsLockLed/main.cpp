@@ -47,7 +47,7 @@ void KeybdLight(DWORD wFlags)
 	CloseHandle(hKeybd);
 }
 
-const DWORD DOUBLE_TAP_MILISECONDS = 400;
+const DWORD DOUBLE_TAP_MILLISECONDS = 400;
 
 DWORD last_time = 0;
 
@@ -59,7 +59,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 	{
 		if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP)
 		{
-			if (kbdllhookstruct->time - last_time < DOUBLE_TAP_MILISECONDS)
+			if (kbdllhookstruct->time - last_time < DOUBLE_TAP_MILLISECONDS)
 			{
 				KeybdLight(KBD_CAPS | KBD_OFF);
 				PostQuitMessage(0);
