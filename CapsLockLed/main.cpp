@@ -161,6 +161,10 @@ LRESULT WndProc(HWND__* hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 					PostQuitMessage(0);
 				}
 			}
+			else if (wParam == PBT_APMRESUMEAUTOMATIC || wParam == PBT_APMRESUMESUSPEND)
+			{
+				KeybdLight(KBD_CAPS | KBD_ON);
+			}
 			break;
 		}
 	}
