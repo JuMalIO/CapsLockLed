@@ -64,8 +64,7 @@ bool IsOnBatteryPower()
 }
 
 const DWORD DOUBLE_TAP_MILLISECONDS = 400;
-
-DWORD _last_time = 0;
+DWORD last_time = 0;
 
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
@@ -75,14 +74,14 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 	{
 		if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP)
 		{
-			if (kbdllhookstruct->time - _last_time < DOUBLE_TAP_MILLISECONDS)
+			if (kbdllhookstruct->time - last_time < DOUBLE_TAP_MILLISECONDS)
 			{
 				KeybdLight(KBD_CAPS | KBD_OFF);
 				PostQuitMessage(0);
 				return 0;
 			}
 
-			_last_time = kbdllhookstruct->time;
+			last_time = kbdllhookstruct->time;
 		}
 
 		KeybdLight(KBD_CAPS | KBD_ON);
@@ -90,14 +89,15 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-bool _flashEnabled = false;
-DWORD _flashSleepMilliseconds = 1000;
+bool batteryPowerEnabled = false;
+bool flashEnabled = false;
+DWORD flashSleepMilliseconds = 1000;
 
 void Flash()
 {
 	for (;;)
 	{
-		Sleep(_flashSleepMilliseconds);
+		Sleep(flashSleepMilliseconds);
 		KeybdLight(KBD_CAPS);
 	}
 }
@@ -155,7 +155,7 @@ LRESULT WndProc(HWND__* hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 		{
 			if (wParam == PBT_APMPOWERSTATUSCHANGE)
 			{
-				if (IsOnBatteryPower())
+				if (!batteryPowerEnabled && IsOnBatteryPower())
 				{
 					KeybdLight(KBD_CAPS | KBD_OFF);
 					PostQuitMessage(0);
@@ -186,11 +186,15 @@ void ReadArguments()
 					int milliseconds = _wtoi(szArgList[i + 1]);
 					if (milliseconds > 0)
 					{
-						_flashSleepMilliseconds = milliseconds;
+						flashSleepMilliseconds = milliseconds;
 					}
 				}
 
-				_flashEnabled = true;
+				flashEnabled = true;
+			}
+			else if (wcscmp(param, L"-b") == 0 || wcscmp(param, L"--battery") == 0)
+			{
+				batteryPowerEnabled = true;
 			}
 		}
 	}
@@ -205,14 +209,14 @@ int WINAPI WinMain(HINSTANCE hInstance,
 {
 	ReadArguments();
 
-	if (IsOnBatteryPower())
+	if (!batteryPowerEnabled && IsOnBatteryPower())
 	{
 		return 0;
 	}
 
 	KeybdLight(KBD_CAPS | KBD_ON);
 
-	if (_flashEnabled)
+	if (flashEnabled)
 	{
 		CreateThread(0, 0, (LPTHREAD_START_ROUTINE)Flash, 0, 0, 0);
 	}
