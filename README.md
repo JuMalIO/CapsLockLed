@@ -1,6 +1,6 @@
 # CapsLockLed
 Turns your Caps Lock LED on to indicate that your PC is running.
-Useful for such PC's which do not have any other LED's to indicate that it is running (when screen is off) like Dell G3.
+Useful for such PC's which do not have any other LED's to indicate power on (when screen is off) like Dell G3.
 
 Possible to enable flash with parametter:
 
