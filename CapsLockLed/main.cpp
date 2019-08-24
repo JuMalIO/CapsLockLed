@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <setupapi.h>
 #include <dinput.h>
 #include <Dbt.h>
 #include <stdexcept>
@@ -8,6 +9,10 @@
 #define HWND_MESSAGE     ((HWND)-3)
 
 #pragma comment(linker, "/subsystem:windows")
+
+#pragma comment(lib, "Setupapi.lib")
+
+GUID GUID_DEVINTERFACE_KEYBOARD = { 0x884b96c3, 0x56ef, 0x11d1, 0xbc, 0x8c, 0x00, 0xa0, 0xc9, 0x14, 0x05, 0xdd };
 
 #define IOCTL_KEYBOARD_SET_INDICATORS CTL_CODE(FILE_DEVICE_KEYBOARD, 0x0002, METHOD_BUFFERED, FILE_ANY_ACCESS)
 #define IOCTL_KEYBOARD_QUERY_TYPEMATIC CTL_CODE(FILE_DEVICE_KEYBOARD, 0x0008, METHOD_BUFFERED, FILE_ANY_ACCESS)
@@ -22,32 +27,61 @@
 
 typedef struct _KEYBOARD_INDICATOR_PARAMETERS
 {
-	WORD wId;
-	WORD wFlags;
+	USHORT  UnitId;
+	USHORT  LedFlags;
 } KEYBOARD_INDICATOR_PARAMETERS, *PKEYBOARD_INDICATOR_PARAMETERS;
 
 void KeybdLight(DWORD wFlags)
 {
-	HANDLE hKeybd;
+	DWORD devindex, needed, retbytes;
+	PSP_INTERFACE_DEVICE_DETAIL_DATA detail;
+	SP_INTERFACE_DEVICE_DATA ifdata = { sizeof(SP_INTERFACE_DEVICE_DATA) };
+	SP_DEVINFO_DATA devdata = { sizeof(SP_DEVINFO_DATA) };
 	KEYBOARD_INDICATOR_PARAMETERS buffer;
-	DWORD retlen;
 
-	DefineDosDevice(DDD_RAW_TARGET_PATH, "Keybd", "\\Device\\KeyboardClass0");
-	hKeybd = CreateFile("\\\\.\\Keybd", GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
+	HDEVINFO info = SetupDiGetClassDevs(&GUID_DEVINTERFACE_KEYBOARD, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+	if (info == INVALID_HANDLE_VALUE)
+	{
+		throw std::runtime_error("SetupDiGetClassDevs failed!");
+		return;
+	}
 
-	DeviceIoControl(hKeybd, IOCTL_KEYBOARD_QUERY_INDICATORS, 0, 0, &buffer, sizeof(buffer), &retlen, 0);
+	for (devindex = 0; SetupDiEnumDeviceInterfaces(info, NULL, &GUID_DEVINTERFACE_KEYBOARD, devindex, &ifdata); ++devindex)
+	{
+		SetupDiGetDeviceInterfaceDetail(info, &ifdata, NULL, 0, &needed, NULL);
 
-	if (wFlags & KBD_ON)
-		buffer.wFlags |= wFlags & 15;
-	else if (wFlags & KBD_OFF)
-		buffer.wFlags = ~(WORD)wFlags & 15;
-	else
-		buffer.wFlags ^= wFlags & 15;
+		detail = (PSP_INTERFACE_DEVICE_DETAIL_DATA)malloc(needed);
+		detail->cbSize = sizeof(SP_INTERFACE_DEVICE_DETAIL_DATA);
 
-	DeviceIoControl(hKeybd, IOCTL_KEYBOARD_SET_INDICATORS, &buffer, sizeof(buffer), 0, 0, &retlen, 0);
+		SetupDiGetDeviceInterfaceDetail(info, &ifdata, detail, needed, NULL, &devdata);
+		
+		HANDLE hKeyb = CreateFile(detail->DevicePath, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+		free((void*)detail);
+		if (hKeyb == INVALID_HANDLE_VALUE)
+		{
+			continue;
+		}
 
-	DefineDosDevice(DDD_REMOVE_DEFINITION, "Keybd", 0);
-	CloseHandle(hKeybd);
+		DeviceIoControl(hKeyb, IOCTL_KEYBOARD_QUERY_INDICATORS, 0, 0, &buffer, sizeof(buffer), &retbytes, 0);
+
+		if (wFlags & KBD_ON)
+			buffer.LedFlags |= wFlags & 15;
+		else if (wFlags & KBD_OFF)
+			buffer.LedFlags = ~(WORD)wFlags & 15;
+		else
+			buffer.LedFlags ^= wFlags & 15;
+
+		DeviceIoControl(hKeyb, IOCTL_KEYBOARD_SET_INDICATORS, &buffer, sizeof(buffer), 0, 0, &retbytes, 0);
+
+		CloseHandle(hKeyb);
+	}
+
+	if (!devindex)
+	{
+		throw std::runtime_error("SetupDiEnumDeviceInterfaces failed!");
+	}
+
+	SetupDiDestroyDeviceInfoList(info);
 }
 
 bool IsOnBatteryPower()
